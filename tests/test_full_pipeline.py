@@ -1,0 +1,218 @@
+"""Integration tests: main graph structure, routing, and the dataset_split node."""
+
+import sys
+from pathlib import Path
+
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from langchain_core.messages import HumanMessage
+from langgraph.graph import END
+
+from core.env_utils import DEEPSEEK_API_KEY
+from core.graph import (
+    _route_after_init,
+    _route_after_model,
+    _route_supervisor_clean_test,
+    _route_supervisor_clean_train,
+    build_full_pipeline,
+)
+
+TESTENV = Path(__file__).resolve().parent / "testenv"
+RAW_CSV = TESTENV / "raw" / "sample.csv"
+SAMPLE_DESCRIPTION = (
+    "Binary classification dataset: predict whether a customer subscribes to a bank term deposit (subscribed: yes/no). "
+    "Features: age, job, education, balance."
+)
+
+
+# ── Graph structure ──────────────────────────────────────────────────────────────────
+
+
+def test_pipeline_graph_contains_all_nodes():
+    pipeline = build_full_pipeline(show_graph=False)
+    graph = pipeline.get_graph()
+    for node in [
+        "init_run",
+        "Agent_Manager_split",
+        "supervisor_split",
+        "agent_manager",
+        "set_clean_train",
+        "data_clean_train",
+        "supervisor_clean_train",
+        "set_clean_test",
+        "data_clean_test",
+        "supervisor_clean_test",
+        "eda_agent",
+        "supervisor_eda",
+        "feature_agent",
+        "supervisor_feature",
+        "model_agent",
+        "business_translator",
+    ]:
+        assert node in graph.nodes
+
+    edges = {(edge.source, edge.target) for edge in graph.edges}
+    assert ("__start__", "init_run") in edges
+    assert ("init_run", "agent_manager") in edges
+    assert ("init_run", "Agent_Manager_split") in edges
+    assert ("Agent_Manager_split", "supervisor_split") in edges
+    assert ("agent_manager", "set_clean_train") in edges
+    assert ("data_clean_train", "supervisor_clean_train") in edges
+    assert ("data_clean_test", "supervisor_clean_test") in edges
+
+
+def test_route_model_to_business_translator_when_best_model():
+    assert _route_after_model({
+        "candidate_models": ["X"],
+        "model_results": {"X": {}},
+        "best_model": {"model_name": "X", "final_test_metrics": {"accuracy": 0.9}},
+    }) == "business_translator"
+
+
+def test_route_model_to_end_without_best_model():
+    assert _route_after_model({
+        "candidate_models": ["X"],
+        "model_results": {"X": {}},
+    }) == END
+
+
+# ── Routing: init_run → Agent_Manager_split / agent_manager ─────────────────────────────
+
+
+def test_route_init_skips_split_when_presplit_paths():
+    assert (
+        _route_after_init(
+            {"is_split": True, "training_data_path": "t.csv", "testing_data_path": "v.csv"}
+        )
+        == "agent_manager"
+    )
+
+
+def test_route_init_goes_Agent_Manager_split_when_not_presplit():
+    assert _route_after_init({"is_split": False}) == "Agent_Manager_split"
+    assert _route_after_init({}) == "Agent_Manager_split"
+
+
+def test_route_train_cleaning_guard_to_next_or_end():
+    assert _route_supervisor_clean_train({
+        "supervisor_hints": {"clean_train": ""},
+        "supervisor_retry": {"clean_train": 0},
+    }) == "set_clean_test"
+
+    assert _route_supervisor_clean_train({
+        "supervisor_hints": {"clean_train": "Fail"},
+        "supervisor_retry": {"clean_train": 1},
+    }) == "reset_clean_train_retry"
+
+    assert _route_supervisor_clean_train({
+        "supervisor_hints": {"clean_train": "Fail"},
+        "supervisor_retry": {"clean_train": 3},
+    }) == END
+
+
+def test_route_test_cleaning_guard_to_next_or_end():
+    assert _route_supervisor_clean_test({
+        "supervisor_hints": {"clean_test": ""},
+        "supervisor_retry": {"clean_test": 0},
+    }) == "eda_agent"
+
+    assert _route_supervisor_clean_test({
+        "supervisor_hints": {"clean_test": "Fail"},
+        "supervisor_retry": {"clean_test": 1},
+    }) == "reset_clean_test_retry"
+
+    assert _route_supervisor_clean_test({
+        "supervisor_hints": {"clean_test": "Fail"},
+        "supervisor_retry": {"clean_test": 3},
+    }) == END
+
+
+# ── Graph: start → init_run ─────────────────────────────────────────────────────
+
+
+def test_pipeline_graph_contains_init_run_node():
+    pipeline = build_full_pipeline(show_graph=False)
+    graph = pipeline.get_graph()
+    assert "init_run" in graph.nodes
+    edges = {(e.source, e.target) for e in graph.edges}
+    assert ("__start__", "init_run") in edges
+    assert ("init_run", "agent_manager") in edges
+    assert ("init_run", "Agent_Manager_split") in edges
+
+
+# ── LLM invoke integration tests (requires API Key)────────────────────────────────────────
+
+
+def _configured_deepseek_key() -> bool:
+    k = (DEEPSEEK_API_KEY or "").strip()
+    if not k or k == "your_deepseek_api_key":
+        return False
+    return not k.lower().startswith("your_")
+
+
+@pytest.mark.skipif(
+    not _configured_deepseek_key(),
+    reason="A valid DEEPSEEK_API_KEY must be configured (not a .env placeholder)",
+)
+def test_full_pipeline_invoke_progresses_from_raw_csv():
+    """Integration test: enter the pipeline from a single CSV, complete at least init; if LLM runs to completion, split paths etc. should be present."""
+    pipeline = build_full_pipeline(show_graph=False)
+    user_input = "Please analyze the dataset, run cleaning, and split into train and test sets."
+    result = pipeline.invoke(
+        {
+            "messages": [HumanMessage(content=user_input)],
+            "user_request": user_input,
+            "data_path": str(RAW_CSV),
+            "description": SAMPLE_DESCRIPTION,
+        },
+        config={"recursion_limit": 120},
+    )
+    assert result.get("run_dir"), "init_run should generate run_dir"
+    assert Path(result["run_dir"]).exists()
+
+    tp = result.get("training_data_path") or ""
+    sp = result.get("testing_data_path") or ""
+    if tp and sp:
+        assert Path(tp).exists()
+        assert Path(sp).exists()
+
+    if result.get("cleaning_passed"):
+        cdp = result.get("cleaned_data_path") or result.get("train_cleaned_data_path")
+        if cdp:
+            assert Path(cdp).exists()
+
+
+# ── Manual integration run (not executed by pytest) ─────────────────────────────────────────────
+
+
+def _run_full_pipeline():
+    from agent.agent_manager import _pretty_print_message
+
+    pipeline = build_full_pipeline(show_graph=True)
+    user_input = input("Enter input: ")
+    events = pipeline.stream(
+        {
+            "messages": [HumanMessage(content=user_input)],
+            "user_request": user_input,
+            "data_path": str(RAW_CSV),
+            "description": SAMPLE_DESCRIPTION,
+        },
+        stream_mode="values",
+        config={"recursion_limit": 120},
+    )
+    for event in events:
+        if "messages" in event:
+            _pretty_print_message(event["messages"][-1])
+        if event.get("current_stage"):
+            print(f"\n[stage] {event['current_stage']}")
+        if event.get("training_data_path"):
+            print(f"[split] train: {event['training_data_path']}")
+            print(f"[split] test:  {event['testing_data_path']}")
+
+
+if __name__ == "__main__":
+    _run_full_pipeline()

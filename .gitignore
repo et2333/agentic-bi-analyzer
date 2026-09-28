@@ -1,0 +1,54 @@
+# 环境配置文件
+**/.env
+!**/.env.example
+!**/.env-example
+
+# Python 字节码缓存（匹配所有层级）
+**/__pycache__/
+*.py[cod]
+
+# 虚拟环境
+.venv/
+.venv-*/
+venv/
+
+# 操作系统自动生成的临时文件
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# 编辑器配置 (可选)
+.vscode/
+.idea/
+
+# 每次运行的中间产物
+/artifacts/
+
+# 仅发布可再分发的 Bank Marketing 演示数据集
+/datasets/*
+!/datasets/README.md
+!/datasets/bank+marketing/
+!/datasets/bank+marketing/**
+
+# RAG 语料由 manifest 在本地重建，不提交第三方正文或私有材料
+**/data/mckinsey_kb/raw/*
+!**/data/mckinsey_kb/raw/.gitkeep
+**/data/mckinsey_kb/source_pdf/*
+!**/data/mckinsey_kb/source_pdf/.gitkeep
+**/data/mckinsey_kb/source_md/*
+!**/data/mckinsey_kb/source_md/.gitkeep
+**/data/mckinsey_kb/manifest.lock.yaml
+**/data/mckinsey_kb/prepare_errors.log
+
+# pytest 缓存
+.pytest_cache/
+**/.pytest_cache/
+
+# 本地会话与临时文件
+**/.Rhistory
+*.log
+*.tmp
+*.bak
+
+# 项目内部开发说明（不对外暴露）
+CLAUDE.md

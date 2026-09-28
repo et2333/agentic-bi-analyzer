@@ -1,0 +1,42 @@
+# Core framework
+langgraph==1.1.10
+langchain-core==1.3.2
+langchain-openai==1.2.1
+langchain-community>=0.4.0,<0.5
+langchain-text-splitters>=1.0.0
+langchain-chroma>=0.1.0
+langsmith==0.8.0
+openai==2.33.0
+
+# RAG (BAT / McKinsey KB)
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+arxiv>=2.1.0
+pyyaml>=6.0
+requests>=2.31.0
+# Manager RAP optional web retrieval (enable RAP_WEB_ENABLED=true in .env)
+duckduckgo-search>=6.0.0
+
+# Data science
+pandas==3.0.2
+numpy==2.4.4
+scikit-learn==1.8.0
+scikit-optimize==0.10.2
+xgboost==3.2.0
+lightgbm>=4.0.0
+shap>=0.46.0
+
+# Visualisation (optional — used for graph export)
+matplotlib>=3.9.0
+seaborn>=0.13.0
+
+# Environment
+python-dotenv==1.2.2
+
+# Web MVP
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.34.0,<1.0
+python-multipart>=0.0.20
+
+# Testing
+pytest==9.0.3

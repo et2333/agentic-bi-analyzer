@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MADS-P · Agentic Analytics</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <main class="shell">
+    <header class="masthead">
+      <div class="brand-mark">M</div>
+      <div>
+        <p class="eyebrow">MULTI-AGENT DATA SCIENCE</p>
+        <h1>从数据到决策，<br><em>看得见的智能分析。</em></h1>
+      </div>
+      <div class="system-chip"><span></span> SINGLE WORKER · MVP</div>
+    </header>
+
+    <section class="workspace">
+      <form id="run-form" class="panel input-panel">
+        <div class="panel-index">01 / INPUT</div>
+        <h2>启动分析任务</h2>
+        <label class="drop-zone" id="drop-zone">
+          <input id="data-file" name="data_file" type="file" accept=".csv,text/csv" required>
+          <span class="drop-icon">↗</span>
+          <strong id="file-label">选择或拖入 CSV 数据</strong>
+          <small>最大 50 MB，任务将按提交顺序执行</small>
+        </label>
+        <label>数据说明
+          <textarea name="description" rows="3" required placeholder="字段含义、业务背景、目标变量等"></textarea>
+        </label>
+        <label>分析目标
+          <textarea name="user_request" rows="3" required placeholder="例如：完成数据清洗、建模，并生成业务洞察报告"></textarea>
+        </label>
+        <div class="two-cols">
+          <label>目标列（可选）<input name="target_column" placeholder="例如：churn"></label>
+          <label>任务类型（可选）
+            <select name="task_type">
+              <option value="">自动识别</option>
+              <option value="classification">分类</option>
+              <option value="regression">回归</option>
+            </select>
+          </label>
+        </div>
+        <button id="submit-button" type="submit"><span>运行 Agent 工作流</span><b>→</b></button>
+        <p class="form-error" id="form-error" role="alert"></p>
+      </form>
+
+      <section class="panel monitor-panel">
+        <div class="panel-index">02 / LIVE RUN</div>
+        <div class="monitor-head">
+          <div>
+            <h2>执行轨迹</h2>
+            <p id="run-id">等待任务提交</p>
+          </div>
+          <div class="status-badge idle" id="status-badge">IDLE</div>
+        </div>
+        <div class="progress-track"><div id="progress-bar"></div></div>
+        <div class="stage-grid" id="stage-grid">
+          <div data-key="split"><span>01</span>任务解析</div>
+          <div data-key="clean"><span>02</span>数据清洗</div>
+          <div data-key="eda"><span>03</span>探索分析</div>
+          <div data-key="feature"><span>04</span>特征工程</div>
+          <div data-key="model"><span>05</span>模型训练</div>
+          <div data-key="bat"><span>06</span>业务转译</div>
+        </div>
+        <div class="event-log" id="event-log">
+          <div class="empty-state">提交任务后，Agent 阶段与关键事件将在这里实时出现。</div>
+        </div>
+      </section>
+    </section>
+
+    <section class="results" id="results" hidden>
+      <div class="result-title"><span>03 / OUTPUT</span><h2>分析结果</h2></div>
+      <div class="metric-grid" id="metric-grid"></div>
+      <div class="result-layout">
+        <article class="report-card"><h3>Business Insight Report</h3><div id="report-content"></div></article>
+        <aside class="artifact-card"><h3>运行产物</h3><div id="artifact-list"></div></aside>
+      </div>
+      <div class="chart-grid" id="chart-grid"></div>
+    </section>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
